@@ -12,14 +12,14 @@ function structuredJobs(jobs) {
   })
 }
 
-const tmpl = require('../lib/machine/debug').template
-const exp = { name: '-', wall: '-', desc: '-', depth:[1], p: [1, 2, 4, 8, 16], optargs: {k: [0, 1], q: ['a', 'b', 'c']} }
+const tmpl = require('../lib/machines/debug').template
+const exp = { name: '-', wall: '-', desc: '-', depth:[1], p: [1, 2, 4, 8, 16], optargs: {k: [0, 1], q: ['a', 'b', 'c'], w:["my string", "your string"]}, cmd: {hello: "./hello"} }
 const epoch = '20160101-000000'
 
 describe('trivial generateJobs', function(){
   it('number of jobs equal to product of optargs and p', function(){
      const j = jobs.generateJobs(tmpl, exp, epoch)
-     expect(j).to.have.length(5*2*3);
+     expect(j).to.have.length(5*2*3*2);
   });
 
   it('jobs is array of objects', function(){
@@ -36,6 +36,13 @@ describe('trivial generateJobs', function(){
      j.map(job => {
        expect(job.filename).to.have.length.least(1)
        expect(job.contents).to.have.length.least(1)
+     })
+  });
+
+  it('optargs with spaces do not have spaces in filename', function(){
+     const j = jobs.generateJobs(tmpl, exp, epoch)
+     j.map(job => {
+       expect(job.filename).to.not.contain(" ")
      })
   });
 })
@@ -66,7 +73,7 @@ describe('simple generateJobs', function(){
 
 
 describe('vulcan', function(){
-  const vulcanTemplate = require('../lib/machine/vulcan').template
+  const vulcanTemplate = require('../lib/machines/vulcan').template
 
   it('generated something', function(){
      const js = jobs.generateJobs(vulcanTemplate, exp, epoch)
@@ -80,7 +87,7 @@ describe('vulcan', function(){
 
 
 describe('rain', function(){
-  const vulcanTemplate = require('../lib/machine/rain').template
+  const vulcanTemplate = require('../lib/machines/rain').template
 
   it('generated something', function(){
      const js = jobs.generateJobs(vulcanTemplate, exp, epoch)
