@@ -2,8 +2,8 @@
 
 local dimebox_dir="$(dirname $(dirname $(readlink -e $(which dimebox))))"
 
-local jobsDir headEpoch canInit=1 maxComplEpochs=5
-local epochArg=
+local jobsDir canInit=1 maxComplEpochs=5
+local epochArg
 
 if [ -d ./experiments/jobs ]; then
   jobsDir='./experiments/jobs/'
@@ -19,15 +19,13 @@ fi
 # TODO: need to get _arguments to allow multi-args. Seems that is what is stopping it
 # from completing after the first arg. Maybe this needs to be done via state.
 
-headEpoch=$(find $jobsDir -maxdepth 1 -type d -name '2*' -print -quit 2>/dev/null)
-
 (( $+functions[_dimebox-epochs] )) ||
 _dimebox-epochs() {
   local files names=() name
-  files=( $(find ${jobsDir} -maxdepth 1 -type d -name '2*' -print | head -n ${maxComplEpochs} ) )
-  names+="HEAD:$(tail -n+2 "${headEpoch}/run.yml" | head -n 1 | sed 's/^desc: //')"
-  # Note: this relies on find sorting files from newest to oldest
+  set -A files ${=$(find ${jobsDir} -maxdepth 1 -type d -name '2*' -print0 | sort -zr | head -n ${maxComplEpochs})}
+  names+="HEAD:$(tail -n+2 ${files[1]}/run.yml | head -n 1 | sed 's/^desc: //')"
   for (( i=2; i<=${#files}; i++ )); do
+    [ -z "${files[i]}" ] && continue
     case $i in
       2)
         name="HEAD~:"
@@ -109,7 +107,6 @@ _dimebox-parsers() {
 # TODO: what does this do exactly?
 local curcontext="$curcontext" state line ret=1
 
-# TODO -C is what?
 _arguments -C \
   '1: :->command'\
   '*:: :->option-or-argument' && ret=0
@@ -130,7 +127,8 @@ commands=(
 
 case $state in
   (command)
-    if [[ -n $headEpoch ]]; then
+    local someEpoch=$(find $jobsDir -maxdepth 1 -type d -name '2*' -print -quit 2>/dev/null)
+    if [[ -n $someEpoch ]]; then
       _describe -t commands command commands && ret=0
       return 0
     else
@@ -162,7 +160,7 @@ case $state in
         _dimebox-machines
         return 0
         ;;
-      (--interval|--batch|-s|--sortBy|-f|--filter|--select)
+      (--interval|--batch|-s|--sortBy|-f|--filter|--select|-t|--tag)
         return 0
         ;;
     esac
