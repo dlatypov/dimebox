@@ -15,31 +15,29 @@ else
   return 0
 fi
 
+# TODO: if epochs share a desc, they get clumped together, which can really screw output
+# TODO: need to get _arguments to allow multi-args. Seems that is what is stopping it
+# from completing after the first arg. Maybe this needs to be done via state.
+
 headEpoch=$(find $jobsDir -maxdepth 1 -type d -name '2*' -print -quit 2>/dev/null)
 
 (( $+functions[_dimebox-epochs] )) ||
 _dimebox-epochs() {
-  local files names=() summaries=()
+  local files names=() name
   files=( $(find ${jobsDir} -maxdepth 1 -type d -name '2*' -print | head -n ${maxComplEpochs} ) )
-  # names=( "HEAD" )
-  # summaries=()
-  # summaries+=$(tail -n+2 "${headEpoch}/run.yml" | head -n 1 | sed 's/^desc: //')
-  names=()
   names+="HEAD:$(tail -n+2 "${headEpoch}/run.yml" | head -n 1 | sed 's/^desc: //')"
   # Note: this relies on find sorting files from newest to oldest
   for (( i=2; i<=${#files}; i++ )); do
     case $i in
       2)
-        names+="HEAD~:$(tail -n+2 "${files[i]}/run.yml" | head -n 1 | sed  's/^desc: //')"
+        name="HEAD~:"
         ;;
       *)
-        names+="HEAD~$((i-2)):$(tail -n+2 "${files[i]}/run.yml" | head -n 1 | sed  's/^desc: //')"
+        name="HEAD~$((i-1))"
         ;;
     esac
-    # summaries+=$(tail -n+2 "${files[i]}/run.yml" | head -n 1 | sed  's/^desc: //')
+    names+="${name}:$(tail -n+2 "${files[i]}/run.yml" | head -n 1 | sed  's/^desc: //')"
   done
-  # TODO: large gap between them and it escapes the spaces in desc
-  # compadd -l -a names -d summaries
   _describe 'values' names
 }
 (( $+functions[_dimebox-opts-generate] )) ||
@@ -146,6 +144,12 @@ case $state in
     cmd=${${commands[(r)$words[1]:*]%%:*}}
     [[ -z $cmd ]] && return 1
 
+    case $cmd in
+      (init|completion)
+        return 0
+      ;;
+    esac
+
     local current prev
     current=${words[$CURRENT]}
     prev=${words[$CURRENT-1]}
@@ -158,17 +162,10 @@ case $state in
         _dimebox-machines
         return 0
         ;;
-      (--interval)
+      (--interval|--batch|-s|--sortBy|-f|--filter|--select)
+        return 0
         ;;
     esac
-
-    case $cmd in
-      (init|completion)
-        return 0
-      ;;
-    esac
-
-    eval _dimebox-opts-${cmd}
 
     for ((i=1; i<$#words; ++i)); do
       [ $i -eq $CURRENT ] && continue
@@ -182,11 +179,28 @@ case $state in
 
     case $cmd in
       (generate)
-        _files -g '*.yml'
+        if [[ ${current} =~ '^-' ]]; then
+          eval _dimebox-opts-${cmd}
+        else
+          for ((i=1; i<$#words; ++i)); do
+            if [[ ${words[$i]} =~ '\.yml$' ]]; then
+              eval _dimebox-opts-${cmd}
+              return 0
+            fi
+          done
+          _files -g '*.yml'
+        fi
         ;;
-      (summary | submit | parse | watch | rm | resolve)
-        [[ ${current} =~ '^-' ]] && break
-        [[ -z $epochArg ]] && _dimebox-epochs
+      (summary | submit | parse | watch | rm | resolve | kill)
+        if [[ ${current} =~ '^-' ]]; then
+          eval _dimebox-opts-${cmd}
+        elif [[ -z $epochArg ]]; then
+          _dimebox-epochs
+        else
+        fi
+        ;;
+      *)
+        eval _dimebox-opts-${cmd}
         ;;
     esac
 esac
