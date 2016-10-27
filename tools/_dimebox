@@ -186,6 +186,7 @@ case $state in
               return 0
             fi
           done
+          [[ $DBX_COMPLETE_OPTS =~ 'both' && -z ${current} ]] && eval _dimebox-opts-${cmd}
           _files -g '*.yml'
         fi
         ;;
@@ -194,6 +195,7 @@ case $state in
           eval _dimebox-opts-${cmd}
         elif [[ -z $epochArg ]]; then
           _dimebox-epochs
+          [[ $DBX_COMPLETE_OPTS =~ 'both' && -z ${current} ]] && eval _dimebox-opts-${cmd}
         else
         fi
         ;;
