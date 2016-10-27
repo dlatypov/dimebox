@@ -33,7 +33,7 @@ _dimebox-epochs() {
         names+="HEAD~:$(tail -n+2 "${files[i]}/run.yml" | head -n 1 | sed  's/^desc: //')"
         ;;
       *)
-        names+="HEAD~${i-2}:$(tail -n+2 "${files[i]}/run.yml" | head -n 1 | sed  's/^desc: //')"
+        names+="HEAD~$((i-2)):$(tail -n+2 "${files[i]}/run.yml" | head -n 1 | sed  's/^desc: //')"
         ;;
     esac
     # summaries+=$(tail -n+2 "${files[i]}/run.yml" | head -n 1 | sed  's/^desc: //')
