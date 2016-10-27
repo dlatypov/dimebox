@@ -1,5 +1,7 @@
 #compdef dimebox
 
+local dimebox_dir="$(dirname $(dirname $(readlink -e $(which dimebox))))"
+
 # TODO: I don't understand this syntax, does it prevent reloading?
 (( $+functions[_dimebox-epochs] )) ||
 _dimebox-epochs() {
@@ -60,6 +62,16 @@ _dimebox-opts-resolve() {
 _dimebox-opts-kill() {
   _arguments \
     '(-m --machine)'{-m,--machine}'[The machine where the experiments are run]'
+}
+(( $+functions[_dimebox-machines] )) ||
+_dimebox-machines() {
+  local opts=( $(find "${dimebox_dir}/lib/machines" "${HOME}/.dimebox/machines" -readable -name '*.js' -exec basename {} '.js' \; 2>/dev/null) )
+  compadd -a opts
+}
+(( $+functions[_dimebox-parsers] )) ||
+_dimebox-parsers() {
+  local opts=( $(find "${dimebox_dir}/lib/parsers" "${HOME}/.dimebox/parsers" -readable -name '*.js' -exec basename {} '.js' \; 2>/dev/null) )
+  compadd -a opts
 }
 
 
