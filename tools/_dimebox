@@ -3,10 +3,66 @@
 # TODO: I don't understand this syntax, does it prevent reloading?
 (( $+functions[_dimebox-epochs] )) ||
 _dimebox-epochs() {
-  local curcontext="$curcontext" state line ret=1
+  local curcontext="$curcontext" state line ret
   # TODO: can use summary/name as desc.
   # How many epochs should this show?
 }
+(( $+functions[_dimebox-opts-generate] )) ||
+_dimebox-opts-generate() {
+  _arguments \
+    '(-m --machine)'{-m,--machine}'[The machine where the experiments will be run]' \
+    '--vc[Grab version control information and store with jobs]' \
+    '--no-vc[Do not grab version control information]' \
+}
+(( $+functions[_dimebox-opts-parse] )) ||
+_dimebox-opts-parse() {
+  _arguments \
+    '(-p --parser)'{-p,--parser}'[Parser used to extract information from each line]' \
+    '--agg[For results that have the same keys, summarize into mean, stddev, etc]' \
+    '--no-agg[Ignore multiple occurences of same key]'\
+    '(-t --tag)'{-t,--tag}'[The tag for the results to show]'\
+    '(-s --sortBy)'{-s,--sortBy}'[List of columns to sort output by, e.g cmd, p, etc]'\
+    '(-f --filter)'{-f,--filter}'[Predicate expression to filter rows by]'\
+    '--select:Only print the specified columns'
+}
+(( $+functions[_dimebox-opts-submit] )) ||
+_dimebox-opts-submit() {
+  _arguments \
+    '(-m --machine)'{-m,--machine}'[The machine where the experiments will be run]' \
+  '--dry-run[Only simulate submission of jobs]'\
+  '--force[Submit jobs for epoch even if already launched before]'\
+  '--stagger[Set up a chain of dependent jobs so that jobs will only be scheduled k at a time]'\
+  '--batch[Size of batch for staggered job submission]'
+}
+(( $+functions[_dimebox-opts-summary] )) ||
+_dimebox-opts-summary() {
+  _arguments \
+  '--sample[Print a sample job file]'\
+  '--no-sample[Do not print a sample job file]'\
+  '--vc[Print version control information]'\
+  '--no-vc[Do not grab version control information]' \
+  '--expfile[Print experiment config YAML file]' \
+  '--no-expfile[Do not print experiment config YAML file]'
+}
+(( $+functions[_dimebox-opts-watch] )) ||
+_dimebox-opts-watch() {
+  _arguments \
+  '--interval[Interval in ms to watch for changes]'
+}
+(( $+functions[_dimebox-opts-rm] )) ||
+_dimebox-opts-rm() {
+}
+(( $+functions[_dimebox-opts-resolve] )) ||
+_dimebox-opts-resolve() {
+  _arguments -s \
+}
+(( $+functions[_dimebox-opts-kill] )) ||
+_dimebox-opts-kill() {
+  _arguments \
+    '(-m --machine)'{-m,--machine}'[The machine where the experiments are run]'
+}
+
+
 local jobsDir canInit=1
 
 if [ -d ./experiments/jobs ]; then
@@ -27,24 +83,25 @@ _arguments -C \
   '1: :->command'\
   '*:: :->option-or-argument' && ret=0
 
+declare -a commands
+commands=(
+  generate:'Generate job files'
+  summary:'Summary of experiment'
+  submit:'Submit all jobs for an epoch'
+  kill:'Kill all jobs for an epoch'
+  parse:'Parse results from a given epoch'
+  watch:'Monitor the status of results for a given epoch.'
+  rm:'Remove the jobs and results for a given epoch.'
+  resolve:'Resolve a symbolic epoch to concrete epoch.'
+  completion:'Output .bashrc completion script.'
+)
+[ $canInit -ne 0 ] && commands+=('init:Initialize directory structure for experiments')
+
 case $state in
   (command)
     local head=$(find $jobsDir -maxdepth 1 -type d -name '2*' -print -quit 2>/dev/null)
 
     if [[ -n $head ]]; then
-      declare -a commands
-      commands=(
-        generate:' Generate job files'
-        summary:' Summary of experiment'
-        submit:' Submit all jobs for an epoch'
-        kill:' Kill all jobs for an epoch'
-        parse:' Parse results from a given epoch'
-        watch:' Monitor the status of results for a given epoch.'
-        rm:' Remove the jobs and results for a given epoch.'
-        resolve:' Resolve a symbolic epoch to concrete epoch.'
-        completion:' Output .bashrc completion script.'
-      )
-      [ $canInit -ne 0 ] && commands+=('init: Initialize directory structure for experiments')
       _describe -t commands command commands && ret=0
       return 0
     else
@@ -54,10 +111,52 @@ case $state in
     fi
     ;;
   (option-or-argument)
-    # TODO: not sure of most idiomatic way to proceed
-    case $words[1] in
+    local cmd
+    cmd=${${commands[(r)$words[1]:*]%%:*}}
+    [[ -z $cmd ]] && return 1
+
+    local epoch
+    for i in $words; do
+      if [[ $i =~ '(^HEAD|2[0-9]{7})' ]]; then
+        epoch=$i
+        break
+      fi
+    done
+
+    # Need to check if previous is a flag with an argument, i.e.
+    # completable: -p,-m
+    # ~ ^: --interval | --batch | (-s --sortBy) (-f --filter) | --select)
+    # TODO: maybe clear interval arg if not num?
+    local current prev
+    current=${words[$CURRENT]}
+    prev=${words[$CURRENT-1]}
+    case $prev in
+      (-p|--parser)
+        _dimebox-parsers
+        return 0
+        ;;
+      (-m|--machine)
+        _dimebox-machines
+        return 0
+        ;;
+      (--interval)
+        ;;
+    esac
+
+    # Leave if command doesn't take anything else
+    case $cmd in
       (init|completion)
         return 0
+      ;;
+    esac
+
+    eval _dimebox-opts-${cmd}
+
+
+    # TODO: not sure of most idiomatic way to proceed
+    case $cmd in
+      (generate)
+        # _dimebox-opts-generate
       ;;
     esac
 esac
